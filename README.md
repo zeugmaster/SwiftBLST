@@ -160,4 +160,6 @@ Verified on Linux with Swift 6.3.2.
 
 ## License
 
-The vendored `blst` code is Apache-2.0; see `LICENSE.blst`.
+The SwiftBLST wrapper (the `SwiftBLST` target and package configuration) is licensed under the MIT License; see [`LICENSE`](LICENSE).
+
+The vendored `blst` library (the `Cblst` target, i.e. everything under `Sources/Cblst`, including the generated `blst.c` and `assembly.S`) is licensed under Apache-2.0 by Supranational; see [`LICENSE.blst`](LICENSE.blst).
