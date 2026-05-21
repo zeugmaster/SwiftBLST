@@ -50,14 +50,14 @@ final class ReliableVectorTests: XCTestCase {
 
     for vector in vectors {
       do {
-        let pubkeys = try vector.pubkeys.map { try PublicKeyG1(compressed: Array(hex: $0)) }
-        let signature = try SignatureG2(compressed: Array(hex: vector.signature))
+        let pubkeys = try vector.pubkeys.map { try BLST.PublicKeyG1(compressed: Array(hex: $0)) }
+        let signature = try BLST.SignatureG2(compressed: Array(hex: vector.signature))
         let message = Array(hex: vector.message)
-        let actual = try AggregateVerification.fastAggregateVerifyMinPK(
+        let actual = try BLST.AggregateVerification.fastAggregateVerifyMinPK(
           publicKeys: pubkeys,
           signature: signature,
           message: message,
-          domainSeparationTag: BLSScheme.proofOfPossession
+          domainSeparationTag: BLST.BLSScheme.proofOfPossession
         )
         XCTAssertEqual(actual, vector.expected, vector.name)
       } catch {
@@ -72,9 +72,9 @@ final class ReliableVectorTests: XCTestCase {
       "0xa491d1b0ecd9bb917989f0e74f0dea0422eac4a873e5e2644f368dffb9a6e20fd6e10c1b77654d067c0618f6e5a7f79a",
       "0xb301803f8b5ac4a1133581fc676dfedc60d891dd5fa99028805e5ea5b08d3491af75d0707adab3b70c6a6a580217bf81",
       "0xb53d21a4cfd562c469cc81514d4ce5a6b577d8403d32a394dc265dd190b47fa9f829fdd7963afdf972e5e77854051f6f",
-    ].map { try PublicKeyG1(compressed: Array(hex: $0)) }
+    ].map { try BLST.PublicKeyG1(compressed: Array(hex: $0)) }
 
-    let aggregate = try PublicKeyG1.aggregate(pubkeys)
+    let aggregate = try BLST.PublicKeyG1.aggregate(pubkeys)
     XCTAssertEqual(
       aggregate.compressedBytes.hexString,
       "a095608b35495ca05002b7b5966729dd1ed096568cf2ff24f3318468e0f3495361414a78ebc09574489bc79e48fca969"
@@ -86,34 +86,34 @@ final class ReliableVectorTests: XCTestCase {
   // cashubtc/cashu-ts PR #661 and cashubtc/nutshell PR #999.
   // Cashu v3 uses G1 points for Y/B_/C_/C and G2 mint public keys.
   func testCashuNUT00BLSV3DeterministicVectors() throws {
-    let cashuDST = BLSScheme.cashu
+    let cashuDST = BLST.BLSScheme.cashu
     XCTAssertEqual(cashuDST, "CASHU_BLS12_381_G1_XMD:SHA-256_SSWU_RO_")
     let secret = Array("test_message".utf8)
-    let blindingFactor = try SecretKey(
+    let blindingFactor = try BLST.SecretKey(
       bytes: Array(hex: "0000000000000000000000000000000000000000000000000000000000000003"))
-    let mintSecretKey = try SecretKey(
+    let mintSecretKey = try BLST.SecretKey(
       bytes: Array(hex: "0000000000000000000000000000000000000000000000000000000000000002"))
 
-    let expectedBaseG2 = try PublicKeyG2(
+    let expectedBaseG2 = try BLST.PublicKeyG2(
       compressed: Array(
         hex:
           "93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8"
       ))
-    let expectedMintPublicKey = try PublicKeyG2(
+    let expectedMintPublicKey = try BLST.PublicKeyG2(
       compressed: Array(
         hex:
           "aa4edef9c1ed7f729f520e47730a124fd70662a904ba1074728114d1031e1572c6c886f6b57ec72a6178288c47c335771638533957d540a9d2370f17cc7ed5863bc0b995b8825e0ee1ea1e1e4d00dbae81f14b0bf3611b78c952aacab827a053"
       ))
 
     XCTAssertEqual(
-      try SecretKey(
+      try BLST.SecretKey(
         bytes: Array(hex: "0000000000000000000000000000000000000000000000000000000000000001")
       ).publicKeyG2(),
       expectedBaseG2
     )
     XCTAssertEqual(mintSecretKey.publicKeyG2(), expectedMintPublicKey)
 
-    let y = SignatureG1.hashToCurve(message: secret, domainSeparationTag: cashuDST)
+    let y = BLST.SignatureG1.hashToCurve(message: secret, domainSeparationTag: cashuDST)
     let blindedMessage = y.multiplied(by: blindingFactor)
     XCTAssertEqual(
       blindedMessage.compressedBytes.hexString,

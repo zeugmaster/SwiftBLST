@@ -7,6 +7,8 @@ This package vendors `blst` and exposes:
 - `SwiftBLST`: ergonomic Swift value types for common BLS signature operations.
 - `Cblst`: the raw C `blst` module for complete low-level access to field, curve, pairing, hash-to-curve, serialization, and aggregate primitives.
 
+The high-level Swift API is namespaced under `BLST` to avoid top-level symbol conflicts when used alongside other cryptography packages such as `secp256k1`/`P256K`.
+
 ## What was researched
 
 BLS signatures over BLS12-381 use two pairing-friendly groups, G1 and G2. The common IETF variants are:
@@ -40,7 +42,7 @@ For raw C APIs, depend on `Cblst` too.
 import SwiftBLST
 
 let ikm = Array(repeating: UInt8(42), count: 32)
-let secretKey = try SecretKey(inputKeyMaterial: ikm)
+let secretKey = try BLST.SecretKey(inputKeyMaterial: ikm)
 let publicKey = secretKey.publicKeyG1()
 let message = Array("hello bls".utf8)
 
@@ -51,7 +53,7 @@ let ok = publicKey.verify(signature: signature, message: message)
 ### Minimal signature variant (PK in G2, signature in G1)
 
 ```swift
-let secretKey = try SecretKey(inputKeyMaterial: Array(repeating: UInt8(7), count: 32))
+let secretKey = try BLST.SecretKey(inputKeyMaterial: Array(repeating: UInt8(7), count: 32))
 let publicKey = secretKey.publicKeyG2()
 let message = Array("minimal signature".utf8)
 
@@ -63,25 +65,25 @@ let ok = publicKey.verify(signature: signature, message: message)
 
 ```swift
 let compressedPK = publicKey.compressedBytes
-let decodedPK = try PublicKeyG1(compressed: compressedPK)
+let decodedPK = try BLST.PublicKeyG1(compressed: compressedPK)
 
 let compressedSignature = signature.compressedBytes
-let decodedSignature = try SignatureG2(compressed: compressedSignature)
+let decodedSignature = try BLST.SignatureG2(compressed: compressedSignature)
 ```
 
 ### Aggregate verification for distinct messages
 
 ```swift
-let sk1 = try SecretKey(inputKeyMaterial: Array(repeating: UInt8(1), count: 32))
-let sk2 = try SecretKey(inputKeyMaterial: Array(repeating: UInt8(2), count: 32))
+let sk1 = try BLST.SecretKey(inputKeyMaterial: Array(repeating: UInt8(1), count: 32))
+let sk2 = try BLST.SecretKey(inputKeyMaterial: Array(repeating: UInt8(2), count: 32))
 let messages = [Array("one".utf8), Array("two".utf8)]
 
-let aggregate = try SignatureG2.aggregate([
+let aggregate = try BLST.SignatureG2.aggregate([
     sk1.signG2(message: messages[0]),
     sk2.signG2(message: messages[1])
 ])
 
-let ok = try AggregateVerification.verifyMinPK(
+let ok = try BLST.AggregateVerification.verifyMinPK(
     publicKeys: [sk1.publicKeyG1(), sk2.publicKeyG1()],
     signature: aggregate,
     messages: messages
@@ -97,12 +99,12 @@ let proof = sk1.proofOfPossessionG2()
 let proofOK = sk1.publicKeyG1().verifyProofOfPossession(proof)
 
 let sameMessage = Array("same message".utf8)
-let aggregate = try SignatureG2.aggregate([
+let aggregate = try BLST.SignatureG2.aggregate([
     sk1.signG2(message: sameMessage),
     sk2.signG2(message: sameMessage)
 ])
 
-let ok = try AggregateVerification.fastAggregateVerifyMinPK(
+let ok = try BLST.AggregateVerification.fastAggregateVerifyMinPK(
     publicKeys: [sk1.publicKeyG1(), sk2.publicKeyG1()],
     signature: aggregate,
     message: sameMessage
@@ -113,22 +115,22 @@ let ok = try AggregateVerification.fastAggregateVerifyMinPK(
 
 SwiftBLST provides high-level wrappers for:
 
-- `SecretKey`
+- `BLST.SecretKey`
   - key generation from IKM via `blst_keygen`
   - serialization/deserialization of 32-byte scalar secret keys
   - public key derivation in G1 or G2
   - signing in G1 or G2
   - proof-of-possession generation
-- `PublicKeyG1` / `PublicKeyG2`
+- `BLST.PublicKeyG1` / `BLST.PublicKeyG2`
   - compressed and uncompressed decoding/encoding
   - subgroup checks
   - individual verification
   - proof-of-possession verification
   - public key aggregation
-- `SignatureG1` / `SignatureG2`
+- `BLST.SignatureG1` / `BLST.SignatureG2`
   - compressed and uncompressed decoding/encoding
   - signature aggregation
-- `AggregateVerification`
+- `BLST.AggregateVerification`
   - aggregate verification for distinct messages
   - fast aggregate verification for one shared message
 - `Cblst`
@@ -136,7 +138,7 @@ SwiftBLST provides high-level wrappers for:
 
 ## Security notes
 
-- Use at least 32 bytes of input key material for `SecretKey(inputKeyMaterial:)`.
+- Use at least 32 bytes of input key material for `BLST.SecretKey(inputKeyMaterial:)`.
 - Domain separation tags matter. Defaults are provided for the common IETF ciphersuite strings, but protocols should specify their own exact DSTs.
 - Decode public keys/signatures with subgroup checks enabled unless you have already cached and authenticated subgroup-check results.
 - Use proof of possession for same-message fast aggregate verification to avoid rogue-key attacks.
