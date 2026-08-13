@@ -141,6 +141,7 @@ SwiftBLST provides high-level wrappers for:
 - Use at least 32 bytes of input key material for `BLST.SecretKey(inputKeyMaterial:)`.
 - Domain separation tags matter. Defaults are provided for the common IETF ciphersuite strings, but protocols should specify their own exact DSTs.
 - Decode public keys/signatures with subgroup checks enabled unless you have already cached and authenticated subgroup-check results.
+- Distinct-message aggregate verification (`verifyMinPK`/`verifyMinSig`) rejects duplicate messages with `BLSError.invalidInput`; repeated messages would allow rogue-key forgeries. For same-message aggregation use `fastAggregateVerify*` with proof of possession.
 - Use proof of possession for same-message fast aggregate verification to avoid rogue-key attacks.
 - This package does not provide random number generation; generate IKM with a cryptographically secure RNG in your application.
 

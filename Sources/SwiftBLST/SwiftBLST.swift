@@ -579,6 +579,12 @@ public enum BLST {
         throw BLSError.invalidInput("public key count must equal message count")
       }
       guard !publicKeys.isEmpty else { throw BLSError.emptyAggregate }
+      // IETF basic-scheme AggregateVerify requires distinct messages: repeated
+      // messages let a rogue key cancel an honest signer's key in the pairing
+      // product, enabling forgery without the victim's secret key.
+      guard Set(messages).count == messages.count else {
+        throw BLSError.invalidInput("messages must be distinct")
+      }
       let dstBytes = dst.utf8Bytes
       let size = blst_pairing_sizeof()
       let raw = UnsafeMutableRawPointer.allocate(
@@ -615,6 +621,10 @@ public enum BLST {
         throw BLSError.invalidInput("public key count must equal message count")
       }
       guard !publicKeys.isEmpty else { throw BLSError.emptyAggregate }
+      // See verifyMinPK: distinct messages are required against rogue keys.
+      guard Set(messages).count == messages.count else {
+        throw BLSError.invalidInput("messages must be distinct")
+      }
       let dstBytes = dst.utf8Bytes
       let size = blst_pairing_sizeof()
       let raw = UnsafeMutableRawPointer.allocate(
