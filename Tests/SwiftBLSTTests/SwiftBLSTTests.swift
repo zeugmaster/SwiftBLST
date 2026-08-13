@@ -99,6 +99,112 @@ final class SwiftBLSTTests: XCTestCase {
         publicKeys: pks, signature: aggregate, message: message))
   }
 
+  func testAggregateVerifyMinPKRejectsDuplicateMessages() throws {
+    let sk1 = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 1, count: 32))
+    let sk2 = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 2, count: 32))
+    let message = Array("same message".utf8)
+    let pks = [sk1.publicKeyG1(), sk2.publicKeyG1()]
+    let aggregate = try BLST.SignatureG2.aggregate([
+      sk1.signG2(message: message),
+      sk2.signG2(message: message),
+    ])
+    XCTAssertThrowsError(
+      try BLST.AggregateVerification.verifyMinPK(
+        publicKeys: pks, signature: aggregate, messages: [message, message])
+    ) { error in
+      XCTAssertEqual(error as? BLST.BLSError, .invalidInput("messages must be distinct"))
+    }
+  }
+
+  func testAggregateVerifyMinSigRejectsDuplicateMessages() throws {
+    let sk1 = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 3, count: 32))
+    let sk2 = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 4, count: 32))
+    let message = Array("same message".utf8)
+    let pks = [sk1.publicKeyG2(), sk2.publicKeyG2()]
+    let aggregate = try BLST.SignatureG1.aggregate([
+      sk1.signG1(message: message),
+      sk2.signG1(message: message),
+    ])
+    XCTAssertThrowsError(
+      try BLST.AggregateVerification.verifyMinSig(
+        publicKeys: pks, signature: aggregate, messages: [message, message])
+    ) { error in
+      XCTAssertEqual(error as? BLST.BLSError, .invalidInput("messages must be distinct"))
+    }
+  }
+
+  func testRogueKeyForgeryMinPKRejected() throws {
+    let skV = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 17, count: 32))
+    let pkV = skV.publicKeyG1()
+    let x = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 34, count: 32))
+    let pkX = x.publicKeyG1()
+
+    // Rogue key pkA = x·G1 − pkV, built from public API alone: flipping the 0x20
+    // sign bit of a compressed G1 encoding yields the point's negation.
+    var negatedBytes = pkV.compressedBytes
+    negatedBytes[0] ^= 0x20
+    let negPkV = try BLST.PublicKeyG1(compressed: negatedBytes)
+    let pkA = try BLST.PublicKeyG1.aggregate([pkX, negPkV])
+    XCTAssertEqual(try BLST.PublicKeyG1.aggregate([pkV, pkA]), pkX)
+
+    // σ* = x·H(m) forges "pkV and pkA both signed m" without the victim's key.
+    let message = Array("forged co-signature".utf8)
+    let forged = x.signG2(message: message)
+    XCTAssertThrowsError(
+      try BLST.AggregateVerification.verifyMinPK(
+        publicKeys: [pkV, pkA], signature: forged, messages: [message, message])
+    ) { error in
+      XCTAssertEqual(error as? BLST.BLSError, .invalidInput("messages must be distinct"))
+    }
+
+    // Control: the same forgery over distinct messages is a bad signature, not an error.
+    XCTAssertFalse(
+      try BLST.AggregateVerification.verifyMinPK(
+        publicKeys: [pkV, pkA],
+        signature: forged,
+        messages: [message, Array("other".utf8)]))
+  }
+
+  func testRogueKeyForgeryMinSigRejected() throws {
+    let skV = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 51, count: 32))
+    let pkV = skV.publicKeyG2()
+    let x = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 68, count: 32))
+    let pkX = x.publicKeyG2()
+
+    var negatedBytes = pkV.compressedBytes
+    negatedBytes[0] ^= 0x20
+    let negPkV = try BLST.PublicKeyG2(compressed: negatedBytes)
+    let pkA = try BLST.PublicKeyG2.aggregate([pkX, negPkV])
+    XCTAssertEqual(try BLST.PublicKeyG2.aggregate([pkV, pkA]), pkX)
+
+    let message = Array("forged co-signature".utf8)
+    let forged = x.signG1(message: message)
+    XCTAssertThrowsError(
+      try BLST.AggregateVerification.verifyMinSig(
+        publicKeys: [pkV, pkA], signature: forged, messages: [message, message])
+    ) { error in
+      XCTAssertEqual(error as? BLST.BLSError, .invalidInput("messages must be distinct"))
+    }
+    XCTAssertFalse(
+      try BLST.AggregateVerification.verifyMinSig(
+        publicKeys: [pkV, pkA],
+        signature: forged,
+        messages: [message, Array("other".utf8)]))
+  }
+
+  func testAggregateVerifySingleSignerStillWorks() throws {
+    let sk = try BLST.SecretKey(inputKeyMaterial: Array(repeating: 11, count: 32))
+    let message = Array("solo".utf8)
+    XCTAssertTrue(
+      try BLST.AggregateVerification.verifyMinPK(
+        publicKeys: [sk.publicKeyG1()], signature: sk.signG2(message: message),
+        messages: [message]))
+    XCTAssertTrue(
+      try BLST.AggregateVerification.verifyMinSig(
+        publicKeys: [sk.publicKeyG2()], signature: sk.signG1(message: message),
+        messages: [message]))
+  }
+
   func testInvalidInputsThrow() throws {
     XCTAssertThrowsError(try BLST.SecretKey(inputKeyMaterial: Array(repeating: 1, count: 31)))
     XCTAssertThrowsError(try BLST.PublicKeyG1(compressed: []))
